@@ -24,6 +24,7 @@ all subsequent method chain returns will be `SafeTraverseState<undefined>`.
     - [`safeTraverse`](#safetraverse)
     - [`SafeTraverseState`](#safetraversestate)
     - [`SafeTraverseStatePromise` (extends `Promise`)](#safetraversestatepromise-extends-promise)
+  - [Examples](#examples)
   - [License](#license)
 
 
@@ -285,6 +286,61 @@ Represents the state of the object and provides the following methods:
 
 Represents the progress of an asynchronous operation.
 
+## Examples
+Fetch an API and read its data. If something goes wrong (e.g., no native `fetch` function), then the result will be undefined.
+```ts
+  /* Imagine the remote response json was like
+    {
+      "success": "OK",
+      "result": [
+        {
+          items: [
+            {
+              "name": "fridge",
+              "age": 5,
+              "requireElectricity": true
+            }
+          ]
+        }
+      ]
+    }
+  */
+const itemsRequireElectricity = await safeTraverse(window)
+  .get("self") // window.self
+  .execute("fetch", "https://some-cool-api.com/api/items") // window.self.fetch(...)
+  .async()
+  .thenAction(res => console.log(status)) // "200"
+  .thenFailSafe("json") // Response#json()
+  .thenValidate(json => safeTraverse(json).getProperty("success") === "OK")
+  .thenGet("result")
+  .thenExpect(_ => _[0].items)
+  .thenValidate(items => Array.isArray(items))
+  .thenSelect(_ => _.filter(item => item?.requireElectricity))
+  .values()
+  .value;
+
+// you can also do like this:
+const itemsRequireElectricity = await safeTraverse(window)
+  .execute("fetch", "https://some-cool-api.com/api/items")
+  .async()
+  .thenFailSafe("json")
+  .thenExpect(_ => _.result[0].items.filter(item => item?.requireElectricity))
+  .values()
+  .value;
+
+// another way is applying safeTraverse only to the response object,
+// if you've already found window.fetch is present.
+const json = await window.fetch("https://some-cool-api.com/api/items")
+  .then(r => r.json())
+  .catch(console.error);
+
+if(json){
+  const itemsRequireElectricity = safeTraverse(json)
+    .expect(_ =>  _.result[0].items.filter(item => item?.requireElectricity))
+    .values()
+    .value
+}
+```
 
 ## License
 
