@@ -1,6 +1,6 @@
 # safe-traverse
 
-The `safe-traverse` library is a enhanced version of optional chains.
+The `safe-traverse` library is an enhanced version of optional chains.
 This allows you to safely access properties of JavaScript objects. This library helps avoid errors when accessing nested properties and simplifies error handling, especially if you want to handle unknown objects.
 
 If a falsy value is encountered in the middle of a method chain,
