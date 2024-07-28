@@ -25,5 +25,12 @@
     "@swc/core": "^1.7.2",
     "mocha": "^10.7.0",
     "typescript": "^5.5.4"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mtripg6666tdr/safe-traverse.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mtripg6666tdr/safe-traverse/issues"
   }
 }
