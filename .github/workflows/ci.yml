@@ -42,8 +42,9 @@ jobs:
         with:
           name: build-out-files
           path: |
-            index.js
-            index.d.ts
+            dist/index.js
+            dist/index.js.map
+            dist/index.d.ts
 
   test:
     runs-on: ubuntu-latest
