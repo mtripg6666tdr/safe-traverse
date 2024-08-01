@@ -103,7 +103,7 @@ const obj2 = {
 
 safeTraverse(obj2).expect(_ => _.throwsError()).value // an error thrown because `throwsError` is callable and throws an error
 ```
-If any errors may be expect to be happened, use `safeExpect` instead.
+If any errors may be expected to happen, use `safeExpect` instead.
 ```ts
 safeTraverse(obj2).safeExpect(_ => _.throwsError()).value // undefined.
 ```
