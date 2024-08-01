@@ -117,13 +117,15 @@ function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
       get value(){
         return value;
       },
-      getProperty: <V extends StringLiteralOrOther<keyof T> = string>(name: V) => value && value[name as keyof NonNullable<T>] !== undefined
-        ? createState(value[name as keyof NonNullable<T>], `${path}.${String(name)}`, proxy) as SafeTraverseStateGetResult<T, any, V, P>
-        : undefinedState(proxy, `${path}.${String(name)}`),
+      getProperty: <V extends StringLiteralOrOther<keyof T> = string>(name: V) => value
+        ?  value[name as keyof NonNullable<T>] !== undefined
+          ? createState(value[name as keyof NonNullable<T>], `${path}.${String(name)}`, proxy) as SafeTraverseStateGetResult<T, any, V, P>
+          : undefinedState(proxy, `${path}.${String(name)}`)
+        : undefinedState(proxy, path),
       get: (...name: string[]) => name.length === 1 ? unproxifiedResult.getProperty(name[0]) : value,
       select: <U = any>(selector: (current: T) => U | undefined | null) => value
         ? createState<U | undefined, boolean>(selector(value) || undefined, `${path}.(selector)`, proxy)
-        : undefinedState(proxy, `${path}.(selector)`),
+        : undefinedState(proxy, path),
       execute: <U extends StringLiteralOrOther<keyof T>>(
         func: U,
         ...args: T extends undefined
@@ -131,10 +133,12 @@ function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
           : T extends { [key in U]: (...args: any[]) => any }
             ? [...Parameters<T[U]>]
             : any[]
-      ) => value && typeof value[func as keyof NonNullable<T>] === "function"
+      ) => value
+        ? typeof value[func as keyof NonNullable<T>] === "function"
         // @ts-expect-error
-        ? createState(value[func as keyof NonNullable<T>](...args), `${path}.#${String(func)}`, proxy)
-        : undefinedState(proxy, `${path}.#${String(func)}`) as any,
+          ? createState(value[func as keyof NonNullable<T>](...args), `${path}.#${String(func)}`, proxy)
+          : undefinedState(proxy, `${path}.#${String(func)}`) as any
+        : undefinedState(proxy, path),
       failSafe: <U extends StringLiteralOrOther<keyof T>>(
         func: U,
         ...args: T extends undefined
@@ -155,9 +159,9 @@ function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
         return result;
       },
       validate: (validator: (value: T) => boolean) => validator(value) ? result : undefinedState(proxy, `${path}.(validator)`),
-      keys: () => value ? createState(Object, `${path}+Object`, false).failSafe("keys", value) : undefinedState(proxy, ""),
-      values: () => value ? createState(Object, `${path}+Object`, false).failSafe("values", value) : undefinedState(proxy, ""),
-      entries: () => value ? createState(Object, `${path}+Object`, false).failSafe("entries", value) : undefinedState(proxy, ""),
+      keys: () => value ? createState(Object, `${path}+Object`, false).failSafe("keys", value) : undefinedState(proxy, path),
+      values: () => value ? createState(Object, `${path}+Object`, false).failSafe("values", value) : undefinedState(proxy, path),
+      entries: () => value ? createState(Object, `${path}+Object`, false).failSafe("entries", value) : undefinedState(proxy, path),
       expect: <U>(invoke: (target: ProxifiedSafeTraverseState<T>) => ProxifiedSafeTraverseState<U>) => {
         const proxifedResult = invoke(createState(value, path, true)) as ProxifiedSafeTraverseState<U>;
 
