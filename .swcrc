@@ -18,7 +18,8 @@
       "mangle": {
         "keepClassNames": true
       }
-    }
+    },
+    "preserveAllComments": true
   },
   "minify": false,
   "module": {

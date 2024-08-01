@@ -295,7 +295,11 @@ function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
     const result = (
       proxy
         ? new Proxy(
-          Object.assign(function(){}, { [INTERNAL]: unproxifiedResult }),
+          Object.assign(
+            /* istanbul ignore next */
+            function(){},
+            { [INTERNAL]: unproxifiedResult }
+          ),
           {
             get: (target, prop) => {
               if (prop === INTERNAL) {
