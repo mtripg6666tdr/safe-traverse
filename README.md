@@ -8,6 +8,10 @@ This allows you to safely access properties of JavaScript objects. This library 
 If a falsy value is encountered in the middle of a method chain,
 all subsequent method chain returns will be `SafeTraverseState<undefined>`.
 
+One of the advantages of using this library is the ability to safely access properties that are expected to exist within an object without casting to `any` in TypeScript. This helps you to capsule potential risks (of mainly accessing properties of null or undefined) into the library itself.
+
+Don't use this library to access properties of objects with guaranteed reliable structures.
+
 - [safe-traverse](#safe-traverse)
   - [Installation](#installation)
   - [Usage](#usage)

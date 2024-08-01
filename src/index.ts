@@ -1,32 +1,41 @@
 // eslint-disable-next-line @typescript-eslint/ban-types
 type StringLiteralOrOther<T> = T | (string & {});
+type IsAny<T> = 0 extends (1 & T) ? true : false;
 
 type SafeTraverseStateGetResult<BaseObject, ExpectedReturnType, PropertyName extends PropertyKey, Proxified extends boolean> =
-  BaseObject extends { [key in PropertyName]: ExpectedReturnType }
+  IsAny<BaseObject> extends true
     ? Proxified extends true
-      ? ProxifiedSafeTraverseState<BaseObject[PropertyName]>
-      : SafeTraverseState<BaseObject[PropertyName]>
-    : Proxified extends true
       ? ProxifiedSafeTraverseState<ExpectedReturnType>
-      : SafeTraverseState<ExpectedReturnType>;
+      : SafeTraverseState<ExpectedReturnType>
+    : BaseObject extends { [key in PropertyName]: ExpectedReturnType }
+      ? Proxified extends true
+        ? ProxifiedSafeTraverseState<BaseObject[PropertyName]>
+        : SafeTraverseState<BaseObject[PropertyName]>
+      : Proxified extends true
+        ? ProxifiedSafeTraverseState<ExpectedReturnType>
+        : SafeTraverseState<ExpectedReturnType>;
 
 type SafeTraverseStateGetResultPromise<BaseObject, ExpectedReturnType, PropertyName extends PropertyKey, Proxified extends boolean> =
-      BaseObject extends { [key in PropertyName]: ExpectedReturnType }
-        ? Proxified extends true
-          ? ProxifiedSafeTraverseState<BaseObject[PropertyName]>
-          : SafeTraverseStatePromise<BaseObject[PropertyName]>
-        : Proxified extends true
-          ? ProxifiedSafeTraverseState<ExpectedReturnType>
-          : SafeTraverseStatePromise<ExpectedReturnType>;
+  IsAny<BaseObject> extends true
+    ? Proxified extends true
+      ? ProxifiedSafeTraverseState<ExpectedReturnType>
+      : SafeTraverseStatePromise<ExpectedReturnType>
+    : BaseObject extends { [key in PropertyName]: ExpectedReturnType }
+      ? Proxified extends true
+        ? ProxifiedSafeTraverseState<BaseObject[PropertyName]>
+        : SafeTraverseStatePromise<BaseObject[PropertyName]>
+      : Proxified extends true
+        ? ProxifiedSafeTraverseState<ExpectedReturnType>
+        : SafeTraverseStatePromise<ExpectedReturnType>;
 
 interface BaseSafeTraverseStateGet<T> {
   (): T;
-  <U = any, V extends StringLiteralOrOther<keyof T> = keyof T>(name: V): SafeTraverseStateGetResult<T, U, V, false>;
+  <U = unknown, V extends StringLiteralOrOther<keyof T> = keyof T extends never ? string : keyof T>(name: V): SafeTraverseStateGetResult<T, U, V, false>;
 }
 
 interface BaseSafeTraverseStateGetPromise<T> {
   (): Promise<T>;
-  <U = any, V extends StringLiteralOrOther<keyof T> = keyof T>(name: V): SafeTraverseStateGetResultPromise<T, U, V, false>;
+  <U = unknown, V extends StringLiteralOrOther<keyof T> = keyof T extends never ? string : keyof T>(name: V): SafeTraverseStateGetResultPromise<T, U, V, false>;
 }
 
 interface BaseSafeTraverseStateExecute<T> {
@@ -181,26 +190,26 @@ function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
               promise
                 .then(result => result.expect(invoke).async(false))
                 .then(result => createState(result.value, result.path, false))
-            )
+            ) as any
           ),
           thenGetProperty: <ExpectedReturn = any, PropertyName extends StringLiteralOrOther<keyof T> = keyof T>(name: PropertyName) => (
             createSafeTraverseStatePromise(
               promise
-                .then(result => result.getProperty<ExpectedReturn, PropertyName>(name).async(false))
+                .then(result => result.getProperty<ExpectedReturn, PropertyName>(name).async(false) as SafeTraverseStatePromise<Awaited<T extends { [key in PropertyName]: any } ? T[PropertyName] : ExpectedReturn>>)
                 .then(result => createState(result.value, result.path, false))
-            ) as SafeTraverseStateGetResultPromise<T, ExpectedReturn, PropertyName, false>
+            ) as any
           ),
           thenGet: (
             <ExpectedReturn = any, PropertyName extends StringLiteralOrOther<keyof T> = keyof T>(name?: PropertyName) => (
               name
                 ? createSafeTraverseStatePromise(
                   promise
-                    .then(result => result.get<ExpectedReturn, PropertyName>(name).async(false))
+                    .then(result => result.get<ExpectedReturn, PropertyName>(name).async(false) as SafeTraverseStatePromise<Awaited<T extends { [key in PropertyName]: any } ? T[PropertyName] : ExpectedReturn>>)
                     .then(result => createState(result.value, result.path, false))
-                )
+                ) as any
                 : promise.then(result => result.get())
-            ) as ReturnType<BaseSafeTraverseStateGetPromise<T>>
-          ) as BaseSafeTraverseStateGetPromise<T>,
+            )
+          ),
           thenAction: (action: (value: T) => void) => (
             createSafeTraverseStatePromise(
               promise.then(result => result.action(action))
@@ -216,31 +225,25 @@ function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
                   : any[]
             ) => (
               createSafeTraverseStatePromise(
-                promise
-                  .then(result => result.call(func, ...args).async(false))
-                  .then(result => createState(result.value, result.path, false))
+                  promise
+                    .then(result => result.call(func, ...args).async(false) as SafeTraverseStatePromise<T extends undefined ? undefined : T extends { [key in FunctionName]: (...args: any[]) => any } ? ReturnType<T[FunctionName]> : unknown>)
+                    .then(result => createState(result.value, result.path, false) as SafeTraverseState<T extends undefined ? undefined : T extends { [key in FunctionName]: (...args: any[]) => any } ? ReturnType<T[FunctionName]> : unknown>)
               )
-            ) as SafeTraverseStatePromise<
-                T extends undefined
-                ? SafeTraverseState<undefined>
-                : T extends { [key in FunctionName]: (...args: any[]) => any }
-                  ? SafeTraverseState<ReturnType<T[FunctionName]>>
-                  : SafeTraverseState<unknown>
-            >
+            ) as any
           ) as BaseSafeTraverseStateExecutePromise<T>,
           thenSelect: <U = any>(selector: (current: T) => U | undefined | null) => (
             createSafeTraverseStatePromise(
               promise
                 .then(result => result.select(selector).async(false))
                 .then(result => createState(result.value, result.path, false))
-            )
+            ) as any
           ),
           thenValidate: (validator: (value: T) => boolean) => (
             createSafeTraverseStatePromise(
               promise
                 .then(result => result.validate(validator))
                 .then(result => createState(result.value, result.path, false))
-            )
+            ) as any
           ),
           thenSafeCall: (
             <FunctionName extends StringLiteralOrOther<keyof T>>(
@@ -253,16 +256,10 @@ function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
             ) => (
               createSafeTraverseStatePromise(
                 promise
-                  .then(result => result.safeCall(func, ...args).async(true))
+                  .then(result => result.safeCall(func, ...args).async(true) as any)
                   .then(result => result.error ? result : createState(result.value, result.path, false))
-              )
-            ) as SafeTraverseStatePromise<
-                T extends undefined
-                ? SafeTraverseState<undefined>
-                : T extends { [key in FunctionName]: (...args: any[]) => any }
-                  ? SafeTraverseState<ReturnType<T[FunctionName]>>
-                  : SafeTraverseState<unknown>
-            >
+              ) as any
+            )
           ) as BaseSafeTraverseStateExecutePromise<T>,
           get thenValue(): Promise<T> {
             return promise.then(result => result.value);
@@ -284,7 +281,7 @@ function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
         if(failSafe){
           const promise = (async () => createState(await value, `${path}.(await)`, false))()
             .catch((err) => undefinedState(false, `${path}.(await)`, err));
-          return createSafeTraverseStatePromise(promise);
+          return createSafeTraverseStatePromise(promise as Promise<SafeTraverseState<Awaited<NonNullable<T>> | undefined>>);
         }else{
           return createSafeTraverseStatePromise((async () => createState(await value, `${path}.(await)`, false))());
         }
@@ -321,9 +318,9 @@ function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
 
     if(unproxifiedResult.value === undefined){
       if(INTERNAL in result){
-        proxifiedUndefinedState = result as ProxifiedSafeTraverseState<undefined>;
+        proxifiedUndefinedState = result as unknown as ProxifiedSafeTraverseState<undefined>;
       }else{
-        unProxifiedUndefinedState = result as SafeTraverseState<undefined>;
+        unProxifiedUndefinedState = result as unknown as SafeTraverseState<undefined>;
       }
     }
 
