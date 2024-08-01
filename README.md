@@ -1,6 +1,7 @@
 # safe-traverse
 
 ![NPM Version](https://img.shields.io/npm/v/safe-traverse)
+![Coverage](https://img.shields.io/codecov/c/github/mtripg6666tdr/safe-traverse)
 
 The `safe-traverse` library is an enhanced version of optional chains.
 This allows you to safely access properties of JavaScript objects. This library helps avoid errors when accessing nested properties and simplifies error handling, especially if you want to handle unknown objects.
@@ -102,7 +103,7 @@ const obj2 = {
 
 safeTraverse(obj2).expect(_ => _.throwsError()).value // an error thrown because `throwsError` is callable and throws an error
 ```
-If any errors may be expect to be happened, use `safeExpect` instead.
+If any errors may be expected to happen, use `safeExpect` instead.
 ```ts
 safeTraverse(obj2).safeExpect(_ => _.throwsError()).value // undefined.
 ```
