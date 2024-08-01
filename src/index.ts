@@ -181,6 +181,10 @@ function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
       safeExpect: <U>(invoke: (target: ProxifiedSafeTraverseState<T>) => ProxifiedSafeTraverseState<U>) => {
         const proxifedResult = invoke(createState(value, path, true, true)) as ProxifiedSafeTraverseState<U>;
 
+        if(proxifedResult[INTERNAL].value === undefined){
+          return undefinedState(false, proxifedResult[INTERNAL].path, proxifedResult[INTERNAL].error);
+        }
+
         return createState(proxifedResult[INTERNAL].value, proxifedResult[INTERNAL].path, false) as SafeTraverseState<U>;
       },
       async: (failSafe = true) => {
@@ -336,7 +340,13 @@ function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
         : unProxifiedUndefinedState ??= createState(undefined, path, false)
     ) as P extends true ? ProxifiedSafeTraverseState<undefined> : SafeTraverseState<undefined>;
 
-    result.error = error;
+    if(error){
+      if(INTERNAL in result){
+        result[INTERNAL].error = error;
+      }else{
+        result.error = error;
+      }
+    }
 
     return result;
   }
