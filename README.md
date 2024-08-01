@@ -1,5 +1,7 @@
 # safe-traverse
 
+![NPM Version](https://img.shields.io/npm/v/safe-traverse)
+
 The `safe-traverse` library is an enhanced version of optional chains.
 This allows you to safely access properties of JavaScript objects. This library helps avoid errors when accessing nested properties and simplifies error handling, especially if you want to handle unknown objects.
 
@@ -39,7 +41,7 @@ npm install safe-traverse
 ### Basic Usage
 
 ```ts
-import safeTraverse from 'safe-traverse';
+import safeTraverse from "safe-traverse";
 
 const obj = {
   a: {
@@ -62,7 +64,7 @@ At the end of the method chain, use the `value` property to retrieve the value.
 **Do not modify `value` property value manually`**
 
 ```ts
-const value = safeTraverse(obj).state.getProperty('a').getProperty('b').getProperty('c').value;
+const value = safeTraverse(obj).getProperty('a').getProperty('b').getProperty('c').value;
 console.log(value); // 42
 ```
 
@@ -71,7 +73,7 @@ console.log(value); // 42
 The `get` method can be used as a more concise alternative to `getProperty` and value.
 
 ```ts
-const value = safeTraverse(obj).state.get("a").get("b").get("c").get();
+const value = safeTraverse(obj).get("a").get("b").get("c").get();
 console.log(value); // 42
 ```
 
@@ -95,6 +97,10 @@ const obj2 = {
 };
 
 safeTraverse(obj2).expect(_ => _.throwsError()).value // an error thrown because `throwsError` is callable and throws an error
+```
+If any errors may be expect to be happened, use `safeExpect` instead.
+```ts
+safeTraverse(obj2).safeExpect(_ => _.throwsError()).value // undefined.
 ```
 Also, returning completely other objects is not permitted:
 ```ts
@@ -127,12 +133,12 @@ console.log(selected); // [42, undefined]
 Note that any errors that occur within the function passed to the `select` method are not handled. 
 If the current object state is already a falsy value, the function will not be called.
 You have to pass the function that never throw errors as long as the argument is not falsy.
-If you are not sure if the function can throw errors or not, use `failSafe` method together for safe operation like:
+If you are not sure if the function can throw errors or not, use `safeCall` method together for safe operation like:
 
 ```ts
 const selected = safeTraverse(obj).get("a")
   .select(o => () => o.b.c /* b will be undefined and reading c throws an error */)
-  .failSafe("call")
+  .safeCall("call")
   .value;
 console.log(selected);
 ```
@@ -142,14 +148,14 @@ console.log(selected);
 You can use `Object.keys`, `Object.values`, and `Object.entries` directly.
 
 ```ts
-safeTraverse(obj).get("a").keys().value // ["b"]
-safeTraverse(obj).get("a").values().value // [{ c: 42 }]
+safeTraverse(obj).get("a").get("b").keys().value // ["c"]
+safeTraverse(obj).get("a").get("b").values().value // [42]
 safeTraverse(obj).get("a").get("b").entries().value // [["c", 42]]
 ```
 
 ### Executing Methods
 
-Use the `execute` method to safely call methods on an object.
+Use the `call` method to safely call methods on an object.
 
 ```ts
 const obj = {
@@ -160,20 +166,20 @@ const obj = {
   }
 };
 
-const result = safeTraverse(obj).getProperty('a').getProperty('b').execute('sum', 1, 2).value;
+const result = safeTraverse(obj).getProperty('a').getProperty('b').call('sum', 1, 2).value;
 console.log(result); // 3
 ```
 
 ### Error Handling
 
-The `failSafe` method attempts to execute a method with the given name. If it fails, it returns a `SafeTraverseState<undefined>` object. If it succeeds, it returns a `SafeTraverseState` object with the method's return value.
+The `safeCall` method attempts to execute a method with the given name. If it fails, it returns a `SafeTraverseState<undefined>` object. If it succeeds, it returns a `SafeTraverseState` object with the method's return value.
 
 ```ts
-const selected = safeTraverse(obj).getProperty('a').failSafe('nonexistentMethod').value;
+const selected = safeTraverse(obj).getProperty('a').safeCall('nonexistentMethod').value;
 console.log(selected); // undefined
 ```
 
-If one or more error(s) occurred while running the method passed to `failSafe` function,
+If one or more error(s) occurred while running the method passed to `safeCall` function,
 the result contains the reason.
 ```ts
 const obj = {
@@ -183,7 +189,7 @@ const obj = {
 };
 
 const result = safeTraverse(obj)
-  .failSafe("fail", "error!");
+  .safeCall("fail", "error!");
 console.log(result.value, result.error?.message); // undefined, error!
 ```
 
@@ -202,25 +208,25 @@ const obj = {
   }
 };
 
-const promise = await safeTraverse(obj).execute("fn").value;
+const promise = await safeTraverse(obj).call("fn").value;
 const status = safeTraverse(obj).get("status").value; // OK
 
 // or
-const status = (await safeTraverse(obj).execute("fn").value).status; // OK
+const status = (await safeTraverse(obj).call("fn").value).status; // OK
 // but accessing `status` may be unsafe
 ```
 
 By using `async` method, the above code will be like this:
 ```ts
-const status = (await safeTraverse(obj).execute("fn").async()).value.status; // OK
+const status = (await safeTraverse(obj).call("fn").async()).value.status; // OK
 ```
 `async` method converts the `SafeTraverseState` into `SafeTraverseStatePromise`, an awaitable object, that will be fulfilled with `SafeTraverseState`.
 
 However, accessing `status` may be still unsafe. To addressing this, use special functions in `SafeTraverseStatePromise` which will be returned by `async` method.
 ```ts
-const status = await safeTraverse(obj).execute("fn").async().thenGetProperty("status").thenValue; // OK
+const status = await safeTraverse(obj).call("fn").async().thenGetProperty("status").thenValue; // OK
 ```
-`SafeTraverseStatePromise` has `thenGetProperty`, `thenGet`, `thenExecute`, etc.
+`SafeTraverseStatePromise` has `thenGetProperty`, `thenGet`, `thenCall`, etc.
 Once you use `async` method, all `then`-prefixed methods return `SafeTraverseStatePromise`, so you can `await` them anytime.  
 When calling `thenGet` with no arguments or getting `thenValue`, they will return native `Promise`s that will be fulfilled with the actual value.
 When calling any other methods in `SafeTraverseStatePromise`, they will return `SafeTraverseStatePromise` that will be fulfilled the `SafeTraverseState` objects.
@@ -276,11 +282,15 @@ Represents the state of the object and provides the following methods:
 - `get(name: string): SafeTraverseState`
 - `get(): any`
 - `expect(invoke: (current: T) => U): SafeTraverseState`
+- `safeExpect(invoke: (current: T) => U): SafeTraverseState<undefined> | SafeTraverseState<any>`
 - `validate(validator: (current: T) => boolean): SafeTraverseState<undefined> | SafeTraverseState<any>`
 - `select(selector: (current: T) => U): SafeTraverseState`
-- `execute(func: string, ...args: any[]): SafeTraverseState`
-- `failSafe(methodName: string): SafeTraverseState<undefined> | SafeTraverseState<any>`
+- `call(func: string, ...args: any[]): SafeTraverseState`
+- `safeCall(methodName: string): SafeTraverseState<undefined> | SafeTraverseState<any>`
 - `async(failSafe?: boolean): SafeTraverseStatePromise`
+- `keys(): string[]`
+- `values:(): any[]`
+- `entries(): any[][]`
 
 ### `SafeTraverseStatePromise` (extends `Promise`)
 
@@ -307,10 +317,10 @@ Fetch an API and read its data. If something goes wrong (e.g., no native `fetch`
   */
 const itemsRequireElectricity = await safeTraverse(window)
   .get("self") // window.self
-  .execute("fetch", "https://some-cool-api.com/api/items") // window.self.fetch(...)
+  .call("fetch", "https://some-cool-api.com/api/items") // window.self.fetch(...)
   .async()
   .thenAction(res => console.log(status)) // "200"
-  .thenFailSafe("json") // Response#json()
+  .thenSafeCall("json") // Response#json()
   .thenValidate(json => safeTraverse(json).getProperty("success") === "OK")
   .thenGet("result")
   .thenExpect(_ => _[0].items)
@@ -321,9 +331,9 @@ const itemsRequireElectricity = await safeTraverse(window)
 
 // you can also do like this:
 const itemsRequireElectricity = await safeTraverse(window)
-  .execute("fetch", "https://some-cool-api.com/api/items")
+  .call("fetch", "https://some-cool-api.com/api/items")
   .async()
-  .thenFailSafe("json")
+  .thenSafeCall("json")
   .thenExpect(_ => _.result[0].items.filter(item => item?.requireElectricity))
   .values()
   .value;

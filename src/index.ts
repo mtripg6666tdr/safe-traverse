@@ -70,8 +70,8 @@ interface BaseSafeTraverseState<T>{
   getProperty: <ExpectedReturn = any, PropertyName extends StringLiteralOrOther<keyof T> = keyof T>(name: PropertyName) => SafeTraverseStateGetResult<T, ExpectedReturn, PropertyName, false>;
   get: BaseSafeTraverseStateGet<T>;
   select: <ExpectedReturn = any>(selector: (current: T) => ExpectedReturn | undefined | null) => SafeTraverseState<ExpectedReturn | undefined>;
-  execute: BaseSafeTraverseStateExecute<T>;
-  failSafe: BaseSafeTraverseStateExecute<T>;
+  call: BaseSafeTraverseStateExecute<T>;
+  safeCall: BaseSafeTraverseStateExecute<T>;
   action: (action: (value: T) => void) => SafeTraverseState<T>;
   validate: (validator: (value: T) => boolean) => SafeTraverseState<T> | SafeTraverseState<undefined>;
   keys: () => SafeTraverseState<StringLiteralOrOther<keyof T>[]>;
@@ -81,18 +81,20 @@ interface BaseSafeTraverseState<T>{
 
 interface SafeTraverseStatePromise<T> extends Promise<SafeTraverseState<T>> {
   thenExpect: <U> (invoke: (target: ProxifiedSafeTraverseState<T>) => ProxifiedSafeTraverseState<U>) => SafeTraverseStatePromise<Awaited<U>>;
+  thenSafeExpect: <U> (invoke: (target: ProxifiedSafeTraverseState<T>) => ProxifiedSafeTraverseState<U>) => SafeTraverseStatePromise<Awaited<U>>;
   thenGetProperty: <ExpectedReturn = any, PropertyName extends StringLiteralOrOther<keyof T> = keyof T>(name: PropertyName) => SafeTraverseStateGetResultPromise<T, ExpectedReturn, PropertyName, false>;
   thenGet: BaseSafeTraverseStateGetPromise<T>;
   thenAction: (action: (value: T) => void) => SafeTraverseStatePromise<T>;
-  thenExecute: BaseSafeTraverseStateExecutePromise<T>;
+  thenCall: BaseSafeTraverseStateExecutePromise<T>;
+  thenSafeCall: BaseSafeTraverseStateExecutePromise<T>;
   thenSelect: <U = any>(selector: (current: T) => U | undefined | null) => SafeTraverseStatePromise<U | undefined>;
   thenValidate: (validator: (value: T) => boolean) => SafeTraverseStatePromise<T | undefined>;
-  thenFailSafe: BaseSafeTraverseStateExecutePromise<T>;
   get thenValue(): Promise<T>;
 }
 
 interface SafeTraverseState<T> extends BaseSafeTraverseState<T> {
   expect: <U> (invoke: (target: ProxifiedSafeTraverseState<T>) => ProxifiedSafeTraverseState<U>) => SafeTraverseState<U>;
+  safeExpect: <U> (invoke: (target: ProxifiedSafeTraverseState<T>) => ProxifiedSafeTraverseState<U>) => SafeTraverseState<U>;
   async: (failSafe?: boolean) => SafeTraverseStatePromise<Awaited<T>>;
 }
 
@@ -110,8 +112,8 @@ type ProxifiedSafeTraverseState<T> = {
 );
 
 function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
-  const createState: <T = any, P extends boolean = false> (value: T, path: string, proxy: P) => P extends true ? ProxifiedSafeTraverseState<T> : SafeTraverseState<T> =
-    <T = any, P extends boolean = false> (value: T, path: string, proxy: P) => {
+  const createState: <T = any, P extends boolean = false> (value: T, path: string, proxy: P, proxifiedSafeCall?: boolean) => P extends true ? ProxifiedSafeTraverseState<T> : SafeTraverseState<T> =
+    <T = any, P extends boolean = false> (value: T, path: string, proxy: P, proxifiedSafeCall = false) => {
     const unproxifiedResult = {
       path,
       get value(){
@@ -119,14 +121,14 @@ function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
       },
       getProperty: <V extends StringLiteralOrOther<keyof T> = string>(name: V) => value
         ?  value[name as keyof NonNullable<T>] !== undefined
-          ? createState(value[name as keyof NonNullable<T>], `${path}.${String(name)}`, proxy) as SafeTraverseStateGetResult<T, any, V, P>
+          ? createState(value[name as keyof NonNullable<T>], `${path}.${String(name)}`, proxy, proxifiedSafeCall) as SafeTraverseStateGetResult<T, any, V, P>
           : undefinedState(proxy, `${path}.${String(name)}`)
         : undefinedState(proxy, path),
       get: (...name: string[]) => name.length === 1 ? unproxifiedResult.getProperty(name[0]) : value,
       select: <U = any>(selector: (current: T) => U | undefined | null) => value
-        ? createState<U | undefined, boolean>(selector(value) || undefined, `${path}.(selector)`, proxy)
+        ? createState<U | undefined, boolean>(selector(value) || undefined, `${path}.(selector)`, proxy, proxifiedSafeCall)
         : undefinedState(proxy, path),
-      execute: <U extends StringLiteralOrOther<keyof T>>(
+      call: <U extends StringLiteralOrOther<keyof T>>(
         func: U,
         ...args: T extends undefined
           ? any[]
@@ -136,10 +138,10 @@ function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
       ) => value
         ? typeof value[func as keyof NonNullable<T>] === "function"
         // @ts-expect-error
-          ? createState(value[func as keyof NonNullable<T>](...args), `${path}.#${String(func)}`, proxy)
+          ? createState(value[func as keyof NonNullable<T>](...args), `${path}.#${String(func)}`, proxy, proxifiedSafeCall)
           : undefinedState(proxy, `${path}.#${String(func)}`) as any
         : undefinedState(proxy, path),
-      failSafe: <U extends StringLiteralOrOther<keyof T>>(
+      safeCall: <U extends StringLiteralOrOther<keyof T>>(
         func: U,
         ...args: T extends undefined
           ? any[]
@@ -148,7 +150,7 @@ function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
             : any[]
       ) => {
         try {
-          return unproxifiedResult.execute(func, ...args);
+          return unproxifiedResult.call(func, ...args);
         }
         catch(err){
           return undefinedState(proxy, `${path}.#${String(func)}(fail)`, err);
@@ -159,11 +161,16 @@ function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
         return result;
       },
       validate: (validator: (value: T) => boolean) => validator(value) ? result : undefinedState(proxy, `${path}.(validator)`),
-      keys: () => value ? createState(Object, `${path}+Object`, false).failSafe("keys", value) : undefinedState(proxy, path),
-      values: () => value ? createState(Object, `${path}+Object`, false).failSafe("values", value) : undefinedState(proxy, path),
-      entries: () => value ? createState(Object, `${path}+Object`, false).failSafe("entries", value) : undefinedState(proxy, path),
+      keys: () => value ? createState(Object, `${path}+Object`, false).safeCall("keys", value) : undefinedState(proxy, path),
+      values: () => value ? createState(Object, `${path}+Object`, false).safeCall("values", value) : undefinedState(proxy, path),
+      entries: () => value ? createState(Object, `${path}+Object`, false).safeCall("entries", value) : undefinedState(proxy, path),
       expect: <U>(invoke: (target: ProxifiedSafeTraverseState<T>) => ProxifiedSafeTraverseState<U>) => {
         const proxifedResult = invoke(createState(value, path, true)) as ProxifiedSafeTraverseState<U>;
+
+        return createState(proxifedResult[INTERNAL].value, proxifedResult[INTERNAL].path, false) as SafeTraverseState<U>;
+      },
+      safeExpect: <U>(invoke: (target: ProxifiedSafeTraverseState<T>) => ProxifiedSafeTraverseState<U>) => {
+        const proxifedResult = invoke(createState(value, path, true, true)) as ProxifiedSafeTraverseState<U>;
 
         return createState(proxifedResult[INTERNAL].value, proxifedResult[INTERNAL].path, false) as SafeTraverseState<U>;
       },
@@ -199,7 +206,7 @@ function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
               promise.then(result => result.action(action))
             )
           ),
-          thenExecute: (
+          thenCall: (
             <FunctionName extends StringLiteralOrOther<keyof T>>(
               func: FunctionName,
               ...args: T extends undefined
@@ -210,7 +217,7 @@ function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
             ) => (
               createSafeTraverseStatePromise(
                 promise
-                  .then(result => result.execute(func, ...args).async(false))
+                  .then(result => result.call(func, ...args).async(false))
                   .then(result => createState(result.value, result.path, false))
               )
             ) as SafeTraverseStatePromise<
@@ -235,7 +242,7 @@ function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
                 .then(result => createState(result.value, result.path, false))
             )
           ),
-          thenFailSafe: (
+          thenSafeCall: (
             <FunctionName extends StringLiteralOrOther<keyof T>>(
               func: FunctionName,
               ...args: T extends undefined
@@ -246,7 +253,7 @@ function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
             ) => (
               createSafeTraverseStatePromise(
                 promise
-                  .then(result => result.failSafe(func, ...args).async(true))
+                  .then(result => result.safeCall(func, ...args).async(true))
                   .then(result => result.error ? result : createState(result.value, result.path, false))
               )
             ) as SafeTraverseStatePromise<
@@ -259,7 +266,14 @@ function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
           ) as BaseSafeTraverseStateExecutePromise<T>,
           get thenValue(): Promise<T> {
             return promise.then(result => result.value);
-          }
+          },
+          thenSafeExpect: <U>(invoke: (target: ProxifiedSafeTraverseState<T>) => ProxifiedSafeTraverseState<U>) => (
+            createSafeTraverseStatePromise(
+              promise
+                .then(result => result.safeExpect(invoke).async(true))
+                .then(result => createState(result.value, result.path, false))
+            )
+          ),
         });
 
         // @ts-expect-error
@@ -290,7 +304,7 @@ function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
               return target[INTERNAL].getProperty(prop as any);
             },
             apply: (target, thisArg, argArray) => {
-              return target[INTERNAL].execute(
+              return target[INTERNAL][proxifiedSafeCall ? "safeCall" : "call"](
                 "call",
                 thisArg[INTERNAL].value, ...argArray
               );
