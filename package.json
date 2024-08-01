@@ -5,8 +5,9 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "swc src -d dist --strip-leading-paths && tsc",
+    "test": "tsc -p tsconfig.build.json && mocha",
+    "coverage": "nyc -r=html -r=text -r=lcov npm test",
+    "build": "swc src -d dist --strip-leading-paths && tsc -p tsconfig.build.json",
     "check": "tsc"
   },
   "files": [
@@ -23,7 +24,9 @@
   "devDependencies": {
     "@swc/cli": "^0.4.0",
     "@swc/core": "^1.7.2",
+    "@types/mocha": "^10.0.7",
     "mocha": "^10.7.0",
+    "nyc": "^17.0.0",
     "typescript": "^5.5.4"
   },
   "repository": {
@@ -32,5 +35,8 @@
   },
   "bugs": {
     "url": "https://github.com/mtripg6666tdr/safe-traverse/issues"
+  },
+  "nyc": {
+    "source-map": true
   }
 }

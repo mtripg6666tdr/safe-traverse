@@ -23,5 +23,6 @@
   "minify": false,
   "module": {
     "type": "umd"
-  }
+  },
+  "sourceMaps": true
 }
