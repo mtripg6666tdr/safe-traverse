@@ -1,6 +1,6 @@
 {
   "name": "safe-traverse",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Enhanced optional chaining. Safe accessing properties of unknown object without whole validation.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
