@@ -1,13 +1,14 @@
 # safe-traverse
 
-![NPM Version](https://img.shields.io/npm/v/safe-traverse)
-![Coverage](https://img.shields.io/codecov/c/github/mtripg6666tdr/safe-traverse)
+[![NPM Version](https://img.shields.io/npm/v/safe-traverse)](https://www.npmjs.com/package/safe-traverse)
+[![CI](https://github.com/mtripg6666tdr/safe-traverse/actions/workflows/ci.yml/badge.svg)](https://github.com/mtripg6666tdr/safe-traverse/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/codecov/c/github/mtripg6666tdr/safe-traverse)](https://app.codecov.io/github/mtripg6666tdr/safe-traverse)
 
 The `safe-traverse` library is an enhanced version of optional chains.
 This allows you to safely access properties of JavaScript objects. This library helps avoid errors when accessing nested properties and simplifies error handling, especially if you want to handle unknown objects.
 
 If a falsy value is encountered in the middle of a method chain,
-all subsequent method chain returns will be `SafeTraverseState<undefined>`.
+all subsequent method chain returns will be [`SafeTraverseState<undefined>`](#safetraversestate).
 
 One of the advantages of using this library is the ability to safely access properties that are expected to exist within an object without casting to `any` in TypeScript. This helps you to capsule potential risks (of mainly accessing properties of null or undefined) into the library itself.
 
@@ -66,7 +67,6 @@ console.log(result.path); // $.a.b.c
 Use the `getProperty` method to access properties of an object. 
 
 At the end of the method chain, use the `value` property to retrieve the value.
-**Do not modify `value` property value manually`**
 
 ```ts
 const value = safeTraverse(obj).getProperty('a').getProperty('b').getProperty('c').value;
@@ -75,7 +75,7 @@ console.log(value); // 42
 
 #### Simplified accessing
 
-The `get` method can be used as a more concise alternative to `getProperty` and value.
+The `get` method can be used as a more concise alternative to `getProperty` and `value`.
 
 ```ts
 const value = safeTraverse(obj).get("a").get("b").get("c").get();
@@ -87,13 +87,13 @@ The `expect` method allows you to simplify the chaining of get methods.
 It provides a concise way to access nested properties.
 ```ts
 safeTraverse(obj).expect(_ => _.a.b.c).value // 42
-safeTraverse(obj).expect(_ => _.a.noProperty).value // undefined
+safeTraverse(obj).expect(_ => _.a.noProperty.noProperty).value // undefined
 safeTraverse(window).expect(_ => new _.AbortController()).value // [object AbortController]
 ```
 While it is possible to execute methods within the `expect` chain, it is not recommended due to the lack of error handling.
 ```ts
 safeTraverse(obj).expect(_ => _.a()).value // `undefined`; no error thrown bacause a is not a function
-safeTraverse(obj).expect(_ => _.noProperty).value // `undefined`; no error thrown because noProperty is undefined
+safeTraverse(obj).expect(_ => _.nomethod()).value // `undefined`; no error thrown because `nomethod` is undefined
 
 const obj2 = {
   throwsError: () => {
@@ -103,15 +103,14 @@ const obj2 = {
 
 safeTraverse(obj2).expect(_ => _.throwsError()).value // an error thrown because `throwsError` is callable and throws an error
 ```
-If any errors may be expected to happen, use `safeExpect` instead.
+If any errors may be expected to occur, use `safeExpect` instead.
 ```ts
 safeTraverse(obj2).safeExpect(_ => _.throwsError()).value // undefined.
 ```
 Also, returning completely other objects is not permitted:
 ```ts
-safeTraverse(obj).expect(_ => [_.a.b]).value // an error thrown because the array is not chaining from `_`
+safeTraverse(obj).expect(_ => [_.a.b]).value // an error thrown because the array is not chaining from `_`. If you really want to do this please use `select` instead.
 ```
-The `expect` method provides an intuitive way to access properties in objects, despite the limitations mentioned above.
 
 ### Validation
 The `validate` method allows you to validate the value of a property in the method chain. It takes a validator function as an argument, which determines whether the value meets the specified criteria. If the validation fails, subsequent method chain returns will be `SafeTraverseState<undefined>`.
@@ -142,8 +141,8 @@ If you are not sure if the function can throw errors or not, use `safeCall` meth
 
 ```ts
 const selected = safeTraverse(obj).get("a")
-  .select(o => () => o.b.c /* b will be undefined and reading c throws an error */)
-  .safeCall("call")
+  .select(o => () => [o.b.c] /* b will be undefined and reading c throws an error */)
+  .safeCall("call") // Call `Function#call` method here
   .value;
 console.log(selected);
 ```
@@ -193,8 +192,7 @@ const obj = {
   }
 };
 
-const result = safeTraverse(obj)
-  .safeCall("fail", "error!");
+const result = safeTraverse(obj).safeCall("fail", "error!");
 console.log(result.value, result.error?.message); // undefined, error!
 ```
 
@@ -202,7 +200,7 @@ console.log(result.value, result.error?.message); // undefined, error!
 
 Use the `async` method to support asynchronous operations.
 
-If the current object state is `Promise` and you want the fulfilled value, normally you have to extract the raw `Promise` value.
+If the current object state is `Promise` and you want the fulfilled value, you may want to extract the raw `Promise` from `value`.
 ```ts
 const obj = {
   fn: async () => {
@@ -213,8 +211,8 @@ const obj = {
   }
 };
 
-const promise = await safeTraverse(obj).call("fn").value;
-const status = safeTraverse(obj).get("status").value; // OK
+const fulfilled = await safeTraverse(obj).call("fn").value; // get a promise and await it to get the fulfilled value
+const status = safeTraverse(fulfilled).get("status").value; // "OK"
 
 // or
 const status = (await safeTraverse(obj).call("fn").value).status; // OK
@@ -225,16 +223,17 @@ By using `async` method, the above code will be like this:
 ```ts
 const status = (await safeTraverse(obj).call("fn").async()).value.status; // OK
 ```
-`async` method converts the `SafeTraverseState` into `SafeTraverseStatePromise`, an awaitable object, that will be fulfilled with `SafeTraverseState`.
+`async` method converts the `SafeTraverseState<Promise<...>>` into `Promise<SafeTraverseState<...>>`.
 
-However, accessing `status` may be still unsafe. To addressing this, use special functions in `SafeTraverseStatePromise` which will be returned by `async` method.
+However, accessing `status` may be still unsafe. To addressing this, use special functions within `Promise` returned by `async` method.
 ```ts
 const status = await safeTraverse(obj).call("fn").async().thenGetProperty("status").thenValue; // OK
 ```
-`SafeTraverseStatePromise` has `thenGetProperty`, `thenGet`, `thenCall`, etc.
-Once you use `async` method, all `then`-prefixed methods return `SafeTraverseStatePromise`, so you can `await` them anytime.  
+In fact, a `Promise` returned by the `async` method are `SafeTraverseState Promise`, enhanced version of the native `Promise`.
+`SafeTraverseStatePromise` has `then`-prefixed methods such as `thenGetProperty`, `thenGet`, `thenCall`, etc.
+If you call one of the `then`-prefixed methods, you will get `Promise` or `SafeTraverseStatePromise`, so you can `await` them anytime.  
 When calling `thenGet` with no arguments or getting `thenValue`, they will return native `Promise`s that will be fulfilled with the actual value.
-When calling any other methods in `SafeTraverseStatePromise`, they will return `SafeTraverseStatePromise` that will be fulfilled the `SafeTraverseState` objects.
+When calling any other `then`-prefixed methods in `SafeTraverseStatePromise`, they will return `SafeTraverseStatePromise` that will be fulfilled the `SafeTraverseState` objects.
 
 ### Action
 The `action` method allows you to call a function without altering the state of the object. The return value of the function is ignored and the method chain continues as is.
@@ -271,12 +270,12 @@ function safeTraverse<T>(obj: T): SafeTraverseState<T>;
 
 You can use one of the following ways:
 ```ts
-import safeTraverseState from "safe-traverse"; // or
-import { safeTraverseState } from "safe-traverse"; // or
-const safeTraverseState = require("safe-traverse");
+import safeTraverse from "safe-traverse"; // or
+import { safeTraverse } from "safe-traverse"; // or
+const safeTraverse = require("safe-traverse");
 
-const state = safeTraverseState(obj) // or
-const state = safeTraverseState.from(obj)
+const state = safeTraverse(obj) // or
+const state = safeTraverse.from(obj)
 ```
 
 ### `SafeTraverseState`
