@@ -137,7 +137,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check failure
-        if: env.WORKFLOW_CONCLUSION == 'failure'
+        if: ${{ env.WORKFLOW_CONCLUSION == 'failure' || env.WORKFLOW_CONCLUSION == 'cancelled' }}
         run: exit 1
 
       - name: Success
