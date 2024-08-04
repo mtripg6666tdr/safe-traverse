@@ -82,7 +82,7 @@ interface BaseSafeTraverseState<T>{
   call: BaseSafeTraverseStateExecute<T>;
   safeCall: BaseSafeTraverseStateExecute<T>;
   action: (action: (value: T) => void) => SafeTraverseState<T>;
-  validate: (validator: (value: T) => boolean) => SafeTraverseState<T> | SafeTraverseState<undefined>;
+  validate: (validator: (value: T) => boolean) => SafeTraverseState<T | undefined>;
   keys: () => SafeTraverseState<StringLiteralOrOther<keyof T>[]>;
   values: () => SafeTraverseState<any[]>;
   entries: () => SafeTraverseState<([keyof T, T[keyof T]] | [string, any])[]>;
@@ -117,7 +117,7 @@ type ProxifiedSafeTraverseState<T> = {
 } & (
   T extends (...args: any[]) => any
     ? (...args: Parameters<T>) => ProxifiedSafeTraverseState<ReturnType<T>>
-    : {}
+    : (...args: any[]) => ProxifiedSafeTraverseState<any>
 );
 
 function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
@@ -145,10 +145,12 @@ function safeTraverseFrom<S>(obj: S): SafeTraverseState<S> {
             ? [...Parameters<T[U]>]
             : any[]
       ) => value
-        ? typeof value[func as keyof NonNullable<T>] === "function"
+        ? value[func as keyof NonNullable<T>]
+          ? typeof value[func as keyof NonNullable<T>] === "function"
         // @ts-expect-error
-          ? createState(value[func as keyof NonNullable<T>](...args), `${path}.#${String(func)}`, proxy, proxifiedSafeCall)
-          : undefinedState(proxy, `${path}.#${String(func)}`) as any
+            ? createState(value[func as keyof NonNullable<T>](...args), `${path}.#${String(func)}`, proxy, proxifiedSafeCall)
+            : undefinedState(proxy, `${path}.#${String(func)}`) as any
+          : undefinedState(proxy, `${path}.${String(func)}`)
         : undefinedState(proxy, path),
       safeCall: <U extends StringLiteralOrOther<keyof T>>(
         func: U,
